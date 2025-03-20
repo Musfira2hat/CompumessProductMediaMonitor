@@ -1,0 +1,27 @@
+{
+    "name": "compumess\-product-media-monitor/compumess-product-media-monitor",
+    "description": "compumess\-product-media-monitor/compumess-product-media-monitor",
+    "type": "shopware-platform-plugin",
+    "version": "1.0.0",
+    "license": "MIT",
+    "require": {
+        "shopware/core": "~6.6.0"
+    },
+    "extra": {
+        "shopware-plugin-class": "Compumess\ProductMediaMonitor\\CompumessProductMediaMonitor",
+        "label": {
+            "de-DE": "Skeleton plugin",
+            "en-GB": "Skeleton plugin"
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Compumess\ProductMediaMonitor\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Compumess\ProductMediaMonitor\\Tests\\": "tests/"
+        }
+    }
+}
