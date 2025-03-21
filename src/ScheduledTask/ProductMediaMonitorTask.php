@@ -4,15 +4,15 @@ namespace Compumess\ProductMediaMonitor\ScheduledTask;
 
 use Shopware\Core\Framework\MessageQueue\ScheduledTask\ScheduledTask;
 
-class ExampleTask extends ScheduledTask
+class ProductMediaMonitorTask extends ScheduledTask
 {
     public static function getTaskName(): string
     {
-        return 'swag.example_task';
+        return 'compumess.product_media_monitor_task';
     }
 
     public static function getDefaultInterval(): int
     {
-        return 300; // 5 minutes
+        return 86400; // 24 hours
     }
 }
