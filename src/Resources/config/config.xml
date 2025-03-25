@@ -9,8 +9,8 @@
             <name>mediaReportRecepients</name>
             <placeholder lang="en-GB">Please use a comma separated list</placeholder>
             <placeholder lang="de-DE">Bitte verwende eine kommaseparierte Liste</placeholder>
-            <label lang="en-GB">Recepients of Product Media Report</label>
-            <label lang="de-DE">Empfänger des Produkt Medien Reports</label>
+            <label lang="en-GB">Recepients of Product Media Report (Please use a comma separated list)</label>
+            <label lang="de-DE">Empfänger des Produkt Medien Reports (Bitte verwende eine kommaseparierte Liste)</label>
         </input-field>
     </card>
 </config>

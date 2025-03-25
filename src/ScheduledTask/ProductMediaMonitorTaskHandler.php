@@ -12,7 +12,7 @@ use Shopware\Core\Content\Product\ProductEntity;
 use Shopware\Core\Framework\DataAbstractionLayer\Dbal\Common\RepositoryIterator;
 use Shopware\Core\Framework\MessageQueue\ScheduledTask\ScheduledTaskHandler;
 use Psr\Log\LoggerInterface;
-use Shopware\Core\Framework\DataAbstractionLayer\Indexing\EntityIndexerRegistry;
+use Shopware\Core\Framework\DataAbstractionLayer\Search\Filter\ContainsFilter;
 
 #[AsMessageHandler(handles: ProductMediaMonitorTask::class)]
 class ProductMediaMonitorTaskHandler extends ScheduledTaskHandler
@@ -44,9 +44,9 @@ class ProductMediaMonitorTaskHandler extends ScheduledTaskHandler
     {
         $context = Context::createDefaultContext();
 
-        $noPictureId = $this->getNoPictureMediaId($context);
+        $noPictureIds = $this->getNoPictureMediaId($context);
 
-        if (!$noPictureId) {
+        if (!$noPictureIds) {
             $this->logger->error('No "no-picture.jpg" found in media repository.');
             return;
         }
@@ -59,7 +59,7 @@ class ProductMediaMonitorTaskHandler extends ScheduledTaskHandler
 
         $iterator = new RepositoryIterator($this->productRepository, $context, $criteria);
         $multipleMedia = [];
-        $noMedia =[];
+        $noMedia = [];
 
         while (($result = $iterator->fetch()) !== null) {
             $products = $result->getEntities();
@@ -68,7 +68,8 @@ class ProductMediaMonitorTaskHandler extends ScheduledTaskHandler
                 /** @var ProductEntity $product */
                 $productId = $product->getId();
                 $productNumber = $product->getProductNumber();
-                $productSeries = $product->getCustomFields()['migration_Compumess57Live_product_series'];
+                $customFields = $product->getCustomFields();
+                $productSeries = $customFields && isset($customFields['migration_Compumess57Live_product_series']) ? $customFields['migration_Compumess57Live_product_series'] : '';
     
                 $cover = $product->getCover();
                 $mediaCollection = $product->getMedia();
@@ -76,15 +77,21 @@ class ProductMediaMonitorTaskHandler extends ScheduledTaskHandler
                 $validMediaIds = [];
                 foreach ($mediaCollection as $productMedia) {
                     $media = $productMedia->getMedia();
-                    
-                    if ($media && $media->getFileName() !== $this->noPictureFilename) {
-                        $validMediaIds[] = $productMedia->getId();
-                    } elseif ($media && $media->getFileName() === $this->noPictureFilename) {
-                        $this->productMediaRepository->delete([['id' => $productMedia->getId()]], $context);
+                
+                    if ($media) {
+                        $mediaId = $media->getId();
+                
+                        if (!isset($noPictureIds[$mediaId])) {
+                            // Media is valid
+                            $validMediaIds[] = $productMedia->getId();
+                        } else {
+                            // Media is "no picture", delete it
+                            $this->productMediaRepository->delete([['id' => $productMedia->getId()]], $context);
+                        }
                     }
                 }
-         
-                if (!$cover || $cover->getMediaId() === $noPictureId) {
+        
+                if (!$cover || isset($noPictureIds[$cover->getMediaId()])) {
                     $this->productRepository->update([['id' => $productId, 'coverId' => null]], $context);
 
                     if (count($validMediaIds) === 1) {
@@ -92,35 +99,40 @@ class ProductMediaMonitorTaskHandler extends ScheduledTaskHandler
                             ['id' => $productId, 'coverId' => $validMediaIds[0]]
                         ], $context);
                     } elseif (count($validMediaIds) > 1) {
-                        // Add to report
-                        $multipleMedia[] = $productSeries;
-                    }elseif (count($validMediaIds) === 0 && $product->getParentId() === null) {
-                        // Add to report if no valid media at all
-                        $noMedia[] = $productNumber;
+                        // Store product number and series as array
+                        $multipleMedia[] = [
+                            'productNumber' => $productNumber,
+                            'productSeries' => $productSeries
+                        ];
+                    } elseif (count($validMediaIds) === 0 && $product->getParentId() === null) {
+                        // Store product number and series as array
+                        $noMedia[] = [
+                            'productNumber' => $productNumber,
+                            'productSeries' => $productSeries
+                        ];
                     }
                 }
             }
         }
 
-        if (!empty($multipleMedia || $noMedia)) {
+        if (!empty($multipleMedia) || !empty($noMedia)) {
             $this->sendReport($multipleMedia, $noMedia, $context);
         }
     }
 
-    private function getNoPictureMediaId(Context $context): ?string
+    private function getNoPictureMediaId(Context $context): ?array
     {
         $criteria = new Criteria();
-        $criteria->addFilter(new EqualsFilter('fileName', $this->noPictureFilename));
-        $criteria->setLimit(1);
+        $criteria->addFilter(new ContainsFilter('path', 'no-picture'));
 
-        $media = $this->mediaRepository->search($criteria, $context)->first();
-        return $media ? $media->getId() : null;
+        $media = $this->mediaRepository->search($criteria, $context)->getIds();
+
+        return $media ?: null;
     }
 
     private function sendReport(array $multipleMedia, array $noMedia, Context $context): void
     {
-        $multipleMedia = implode(', ', $multipleMedia);
-        $noMedia = implode(', ', $noMedia);
+        // No need to implode here, pass the complete arrays to the mail service
         $this->mailServiceHelper->sendReportEmail($multipleMedia, $noMedia, $context);
     }
 }

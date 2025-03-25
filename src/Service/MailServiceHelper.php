@@ -15,18 +15,22 @@ class MailServiceHelper
     private $mailService;
     private $mailTemplateTypeRepo;
     private $systemConfigService;
+    private $salesChannelRepository;
+
 
     public const PRODUCT_MEDIA_MONITOR_REPORT = "product_media_monitor_report";
     public function __construct(
         EntityRepository $mailTemplateRepository,
         MailService $mailService,
         EntityRepository $mailTemplateTypeRepo,
-        SystemConfigService $systemConfigService
+        SystemConfigService $systemConfigService,
+        EntityRepository $salesChannelRepository
     ) {
         $this->mailTemplateRepository = $mailTemplateRepository;
         $this->mailService = $mailService;
         $this->mailTemplateTypeRepo = $mailTemplateTypeRepo;
         $this->systemConfigService = $systemConfigService;
+        $this->salesChannelRepository = $salesChannelRepository;
     }
     public function sendReportEmail($multipleMedia, $noMedia, $context)
     {
@@ -58,11 +62,12 @@ class MailServiceHelper
 
         $data->set('recipients', $recipientArray);
         $data->set('senderName', $mailTemplate->getTranslation('senderName'));
+        $data->set('salesChannelId', $this->getSalesChannelIdByName('CME - CompuMess Elektronik GmbH', $context));
         $data->set('contentHtml', $mailTemplate->getTranslation('contentHtml'));
         $data->set('contentPlain', $mailTemplate->getTranslation('contentPlain'));
         $data->set('subject', $mailTemplate->getTranslation('subject'));
 
-        try{
+        try {
             $this->mailService->send(
                 $data->all(),
                 $context,
@@ -84,5 +89,16 @@ class MailServiceHelper
         $mailTemplateTypeDetails = $result->first();
 
         return ($mailTemplateTypeDetails) ? $mailTemplateTypeDetails->getId() : null;
+    }
+
+    private function getSalesChannelIdByName(string $name, $context): ?string
+    {
+        $criteria = new Criteria();
+        $criteria->addFilter(new EqualsFilter('name', $name));
+        $criteria->setLimit(1);
+
+        $salesChannel = $this->salesChannelRepository->search($criteria, $context)->first();
+
+        return $salesChannel ? $salesChannel->getId() : null;
     }
 }
